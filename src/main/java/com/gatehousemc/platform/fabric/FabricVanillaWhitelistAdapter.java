@@ -2,9 +2,9 @@ package com.gatehousemc.platform.fabric;
 
 import com.gatehousemc.domain.PlayerIdentity;
 import com.gatehousemc.port.VanillaWhitelistPort;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.players.NameAndId;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.WhitelistEntry;
+import net.minecraft.server.players.UserWhiteListEntry;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -18,9 +18,9 @@ public final class FabricVanillaWhitelistAdapter implements VanillaWhitelistPort
     @Override
     public CompletableFuture<Boolean> isWhitelisted(PlayerIdentity identity) {
         return onServerThread(() -> {
-            boolean allowed = server.getPlayerManager().getWhitelist().isAllowed(profile(identity));
-            if (!allowed && server.isOnlineMode()) {
-                allowed = server.getPlayerManager().getWhitelist().isAllowed(new GameProfile(identity.offlineUuid(), identity.exactUsername()));
+            boolean allowed = server.getPlayerList().getWhiteList().isWhiteListed(profile(identity));
+            if (!allowed && server.usesAuthentication()) {
+                allowed = server.getPlayerList().getWhiteList().isWhiteListed(new NameAndId(identity.offlineUuid(), identity.exactUsername()));
             }
             return allowed;
         });
@@ -29,7 +29,7 @@ public final class FabricVanillaWhitelistAdapter implements VanillaWhitelistPort
     @Override
     public CompletableFuture<Void> addExactProfile(PlayerIdentity identity) {
         return onServerThread(() -> {
-            server.getPlayerManager().getWhitelist().add(new WhitelistEntry(profile(identity)));
+            server.getPlayerList().getWhiteList().add(new UserWhiteListEntry(profile(identity)));
             return null;
         });
     }
@@ -37,22 +37,22 @@ public final class FabricVanillaWhitelistAdapter implements VanillaWhitelistPort
     @Override
     public CompletableFuture<Void> removeExactProfile(PlayerIdentity identity) {
         return onServerThread(() -> {
-            server.getPlayerManager().getWhitelist().remove(profile(identity));
-            if (server.isOnlineMode()) {
-                server.getPlayerManager().getWhitelist().remove(new GameProfile(identity.offlineUuid(), identity.exactUsername()));
+            server.getPlayerList().getWhiteList().remove(profile(identity));
+            if (server.usesAuthentication()) {
+                server.getPlayerList().getWhiteList().remove(new NameAndId(identity.offlineUuid(), identity.exactUsername()));
             }
             return null;
         });
     }
 
-    private GameProfile profile(PlayerIdentity identity) {
-        if (server.isOnlineMode() && server.getUserCache() != null) {
-            java.util.Optional<GameProfile> cached = server.getUserCache().findByName(identity.exactUsername());
+    private NameAndId profile(PlayerIdentity identity) {
+        if (server.usesAuthentication()) {
+            java.util.Optional<NameAndId> cached = server.services().nameToIdCache().get(identity.exactUsername());
             if (cached.isPresent()) {
                 return cached.get();
             }
         }
-        return new GameProfile(identity.offlineUuid(), identity.exactUsername());
+        return new NameAndId(identity.offlineUuid(), identity.exactUsername());
     }
 
     private <T> CompletableFuture<T> onServerThread(java.util.function.Supplier<T> action) {

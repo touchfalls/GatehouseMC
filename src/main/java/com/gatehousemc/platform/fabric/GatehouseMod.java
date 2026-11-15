@@ -4,12 +4,12 @@ import com.gatehousemc.config.ConfigLoader;
 import com.gatehousemc.config.ModConfig;
 import com.gatehousemc.i18n.Messages;
 import com.gatehousemc.platform.fabric.command.GatehouseCommands;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.players.NameAndId;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,17 +103,17 @@ public final class GatehouseMod implements ModInitializer {
         }
     }
 
-    public static Text handleWhitelistDenial(GameProfile profile) {
+    public static Component handleWhitelistDenial(NameAndId profile) {
         FabricRuntime current = runtime;
-        if (current == null) return Text.literal(Messages.get("reject.not_whitelisted"));
+        if (current == null) return Component.literal(Messages.get("reject.not_whitelisted"));
         try {
-            if (current.server() != null && current.server().getUserCache() != null && profile != null) {
-                current.server().getUserCache().add(profile);
+            if (current.server() != null && profile != null) {
+                current.server().services().nameToIdCache().add(profile);
             }
-            return current.onWhitelistDenied(new FabricRuntime.GameProfileIdentity(profile.getId(), profile.getName()));
+            return current.onWhitelistDenied(new FabricRuntime.GameProfileIdentity(profile.id(), profile.name()));
         } catch (Exception error) {
             LOGGER.warn("Whitelist denial handling failed for profile {}", profile, error);
-            return Text.literal(Messages.get("reject.unavailable"));
+            return Component.literal(Messages.get("reject.unavailable"));
         }
     }
 

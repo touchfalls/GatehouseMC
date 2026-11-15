@@ -13,10 +13,12 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
-import net.minecraft.command.CommandSource;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
 
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -25,28 +27,28 @@ import java.util.function.Supplier;
 public final class GatehouseCommands {
     private GatehouseCommands() {}
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, Supplier<FabricRuntime> runtimeSupplier) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, Supplier<FabricRuntime> runtimeSupplier) {
         dispatcher.register(buildCommand(runtimeSupplier));
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<ServerCommandSource> buildCommand(
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildCommand(
             Supplier<FabricRuntime> runtimeSupplier) {
-        return CommandManager.literal("gatehouse")
+        return Commands.literal("gatehouse")
                 .requires(source -> {
                     FabricRuntime runtime = runtimeSupplier.get();
                     int level = runtime == null ? 2 : runtime.config().minecraft().viewPermissionLevel();
-                    return source.hasPermissionLevel(level);
+                    return has(source, level);
                 })
                 .executes(GatehouseCommands::help)
-                .then(CommandManager.literal("help").executes(GatehouseCommands::help))
-                .then(CommandManager.literal("requests")
+                .then(Commands.literal("help").executes(GatehouseCommands::help))
+                .then(Commands.literal("requests")
                         .executes(context -> requests(context, runtimeSupplier, "pending"))
-                        .then(CommandManager.argument("status", StringArgumentType.word())
-                                .suggests((context, builder) -> CommandSource.suggestMatching(
+                        .then(Commands.argument("status", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         new String[]{"pending", "resolving", "approved", "denied", "blocked", "all"}, builder))
                                 .executes(context -> requests(context, runtimeSupplier,
                                         context.getArgument("status", String.class)))
-                                .then(CommandManager.argument("page", IntegerArgumentType.integer(1))
+                                .then(Commands.argument("page", IntegerArgumentType.integer(1))
                                         .executes(context -> requests(context, runtimeSupplier,
                                                 context.getArgument("status", String.class))))))
                 .then(referenceAction("show", AdminCommand.Kind.SHOW, runtimeSupplier, false))
@@ -55,74 +57,74 @@ public final class GatehouseCommands {
                 .then(referenceAction("block", AdminCommand.Kind.BLOCK, runtimeSupplier, true))
                 .then(referenceAction("reopen", AdminCommand.Kind.REOPEN, runtimeSupplier, true))
                 .then(referenceAction("undo", AdminCommand.Kind.UNDO, runtimeSupplier, true))
-                .then(CommandManager.literal("unblock")
-                        .then(CommandManager.argument("username", StringArgumentType.word())
+                .then(Commands.literal("unblock")
+                        .then(Commands.argument("username", StringArgumentType.word())
                                 .executes(context -> executeText(context, runtimeSupplier,
                                         "unblock " + context.getArgument("username", String.class)))
-                                .then(CommandManager.argument("reason", StringArgumentType.greedyString())
+                                .then(Commands.argument("reason", StringArgumentType.greedyString())
                                         .executes(context -> executeText(context, runtimeSupplier,
                                                 "unblock " + context.getArgument("username", String.class) + " "
                                                         + context.getArgument("reason", String.class))))))
-                .then(CommandManager.literal("status").executes(context -> status(context, runtimeSupplier)))
-                .then(CommandManager.literal("reload").executes(context -> reload(context, runtimeSupplier)))
-                .then(CommandManager.literal("provider")
-                        .then(CommandManager.literal("status")
+                .then(Commands.literal("status").executes(context -> status(context, runtimeSupplier)))
+                .then(Commands.literal("reload").executes(context -> reload(context, runtimeSupplier)))
+                .then(Commands.literal("provider")
+                        .then(Commands.literal("status")
                                 .executes(context -> executeText(context, runtimeSupplier, "provider status"))
-                                .then(CommandManager.argument("provider", StringArgumentType.word())
+                                .then(Commands.argument("provider", StringArgumentType.word())
                                         .executes(context -> executeText(context, runtimeSupplier,
                                                 "provider status " + context.getArgument("provider", String.class)))))
-                        .then(CommandManager.literal("test")
-                                .then(CommandManager.argument("provider", StringArgumentType.word())
+                        .then(Commands.literal("test")
+                                .then(Commands.argument("provider", StringArgumentType.word())
                                         .executes(context -> executeText(context, runtimeSupplier,
                                                 "provider test " + context.getArgument("provider", String.class))))))
-                .then(CommandManager.literal("setup")
-                        .then(CommandManager.literal("status").executes(context -> executeText(context, runtimeSupplier, "setup status")))
-                        .then(CommandManager.literal("discord").executes(context -> executeText(context, runtimeSupplier, "setup discord")))
-                        .then(CommandManager.literal("telegram").executes(context -> executeText(context, runtimeSupplier, "setup telegram")))
-                        .then(CommandManager.literal("bind")
-                                .then(CommandManager.argument("provider", StringArgumentType.word())
-                                        .then(CommandManager.argument("code", StringArgumentType.word())
+                .then(Commands.literal("setup")
+                        .then(Commands.literal("status").executes(context -> executeText(context, runtimeSupplier, "setup status")))
+                        .then(Commands.literal("discord").executes(context -> executeText(context, runtimeSupplier, "setup discord")))
+                        .then(Commands.literal("telegram").executes(context -> executeText(context, runtimeSupplier, "setup telegram")))
+                        .then(Commands.literal("bind")
+                                .then(Commands.argument("provider", StringArgumentType.word())
+                                        .then(Commands.argument("code", StringArgumentType.word())
                                                 .executes(context -> executeText(context, runtimeSupplier,
                                                         "setup bind " + context.getArgument("provider", String.class) + " "
                                                                 + context.getArgument("code", String.class))))))
-                        .then(CommandManager.literal("cancel")
-                                .then(CommandManager.argument("provider", StringArgumentType.word())
+                        .then(Commands.literal("cancel")
+                                .then(Commands.argument("provider", StringArgumentType.word())
                                         .executes(context -> executeText(context, runtimeSupplier,
                                                 "setup cancel " + context.getArgument("provider", String.class))))))
-                .then(CommandManager.literal("admin")
-                        .then(CommandManager.literal("list")
-                                .then(CommandManager.argument("provider", StringArgumentType.word())
+                .then(Commands.literal("admin")
+                        .then(Commands.literal("list")
+                                .then(Commands.argument("provider", StringArgumentType.word())
                                         .executes(context -> executeText(context, runtimeSupplier,
                                                 "admin list " + context.getArgument("provider", String.class)))))
-                        .then(CommandManager.literal("add")
-                                .then(CommandManager.argument("provider", StringArgumentType.word())
-                                        .then(CommandManager.argument("principal", StringArgumentType.word())
-                                                .then(CommandManager.argument("access", StringArgumentType.word())
+                        .then(Commands.literal("add")
+                                .then(Commands.argument("provider", StringArgumentType.word())
+                                        .then(Commands.argument("principal", StringArgumentType.word())
+                                                .then(Commands.argument("access", StringArgumentType.word())
                                                         .executes(context -> executeText(context, runtimeSupplier,
                                                                 "admin add " + context.getArgument("provider", String.class) + " "
                                                                         + context.getArgument("principal", String.class) + " "
                                                                         + context.getArgument("access", String.class)))))))
-                        .then(CommandManager.literal("remove")
-                                .then(CommandManager.argument("provider", StringArgumentType.word())
-                                        .then(CommandManager.argument("principal", StringArgumentType.word())
+                        .then(Commands.literal("remove")
+                                .then(Commands.argument("provider", StringArgumentType.word())
+                                        .then(Commands.argument("principal", StringArgumentType.word())
                                                 .executes(context -> executeText(context, runtimeSupplier,
                                                         "admin remove " + context.getArgument("provider", String.class) + " "
                                                                 + context.getArgument("principal", String.class)))))));
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<ServerCommandSource> referenceAction(
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> referenceAction(
             String name, AdminCommand.Kind kind, Supplier<FabricRuntime> supplier, boolean reasonAllowed) {
-        var request = CommandManager.argument("request", StringArgumentType.word())
+        var request = Commands.argument("request", StringArgumentType.word())
                 .executes(context -> executeReference(context, supplier, kind, ""));
         if (reasonAllowed) {
-            request.then(CommandManager.argument("reason", StringArgumentType.greedyString())
+            request.then(Commands.argument("reason", StringArgumentType.greedyString())
                     .executes(context -> executeReference(context, supplier, kind,
                             context.getArgument("reason", String.class))));
         }
-        return CommandManager.literal(name).then(request);
+        return Commands.literal(name).then(request);
     }
 
-    private static int requests(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier, String statusText) {
+    private static int requests(CommandContext<CommandSourceStack> context, Supplier<FabricRuntime> supplier, String statusText) {
         try {
             int page = 1;
             try { page = context.getArgument("page", Integer.class); } catch (IllegalArgumentException ignored) { }
@@ -134,7 +136,7 @@ public final class GatehouseCommands {
         }
     }
 
-    private static int executeReference(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier,
+    private static int executeReference(CommandContext<CommandSourceStack> context, Supplier<FabricRuntime> supplier,
                                         AdminCommand.Kind kind, String reason) {
         try {
             return execute(context, supplier, AdminCommand.base(kind).withRequest(
@@ -144,29 +146,29 @@ public final class GatehouseCommands {
         }
     }
 
-    private static int executeText(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier, String text) {
+    private static int executeText(CommandContext<CommandSourceStack> context, Supplier<FabricRuntime> supplier, String text) {
         AdminCommandResult parsed = AdminCommandParser.parse(text);
         if (!parsed.succeeded()) return fail(context, parsed.message());
         return execute(context, supplier, (AdminCommand) parsed.value().orElseThrow());
     }
 
-    private static int execute(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier,
+    private static int execute(CommandContext<CommandSourceStack> context, Supplier<FabricRuntime> supplier,
                                AdminCommand command) {
         FabricRuntime runtime = supplier.get();
         if (runtime == null || runtime.adminCommands() == null || runtime.commandExecutor() == null) {
             return fail(context, Messages.get("command.not_available"));
         }
-        ServerCommandSource source = context.getSource();
+        CommandSourceStack source = context.getSource();
         runtime.commandExecutor().execute(() -> runtime.adminCommands().execute(command, principalOf(source))
                 .whenComplete((result, error) -> source.getServer().execute(() -> {
-                    if (error != null) source.sendError(Text.literal(Messages.get("command.decision_failed", safeMessage(error))));
-                    else if (result.succeeded()) source.sendFeedback(() -> Text.literal(AdminResultRenderer.render(result)), false);
-                    else source.sendError(Text.literal(result.message()));
+                    if (error != null) source.sendFailure(Component.literal(Messages.get("command.decision_failed", safeMessage(error))));
+                    else if (result.succeeded()) source.sendSuccess(() -> Component.literal(AdminResultRenderer.render(result)), false);
+                    else source.sendFailure(Component.literal(result.message()));
                 })));
         return 1;
     }
 
-    private static int status(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
+    private static int status(CommandContext<CommandSourceStack> context, Supplier<FabricRuntime> supplier) {
         FabricRuntime runtime = supplier.get();
         if (runtime == null || runtime.status() == null) return fail(context, Messages.get("command.not_available"));
         var snapshot = runtime.status().snapshot();
@@ -176,28 +178,32 @@ public final class GatehouseCommands {
                 + " outbox=" + snapshot.pendingOutbox());
     }
 
-    private static int reload(CommandContext<ServerCommandSource> context, Supplier<FabricRuntime> supplier) {
+    private static int reload(CommandContext<CommandSourceStack> context, Supplier<FabricRuntime> supplier) {
         return executeText(context, supplier, "reload");
     }
 
-    private static AdminPrincipal principalOf(ServerCommandSource source) {
+    private static AdminPrincipal principalOf(CommandSourceStack source) {
         if (source.getEntity() == null) return AdminPrincipal.console();
-        int level = source.hasPermissionLevel(4) ? 4 : source.hasPermissionLevel(3) ? 3 :
-                source.hasPermissionLevel(2) ? 2 : source.hasPermissionLevel(1) ? 1 : 0;
-        return new AdminPrincipal("minecraft", "perm:" + level, source.getName());
+        int level = has(source, 4) ? 4 : has(source, 3) ? 3 :
+                has(source, 2) ? 2 : has(source, 1) ? 1 : 0;
+        return new AdminPrincipal("minecraft", "perm:" + level, source.getTextName());
     }
 
-    private static int help(CommandContext<ServerCommandSource> context) {
+    private static boolean has(CommandSourceStack source, int level) {
+        return source.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.byId(level)));
+    }
+
+    private static int help(CommandContext<CommandSourceStack> context) {
         return feedback(context, Messages.get("command.help"));
     }
 
-    private static int feedback(CommandContext<ServerCommandSource> context, String message) {
-        context.getSource().sendFeedback(() -> Text.literal(message), false);
+    private static int feedback(CommandContext<CommandSourceStack> context, String message) {
+        context.getSource().sendSuccess(() -> Component.literal(message), false);
         return 1;
     }
 
-    private static int fail(CommandContext<ServerCommandSource> context, String message) {
-        context.getSource().sendError(Text.literal(message == null || message.isBlank() ? "Invalid Gatehouse command" : message));
+    private static int fail(CommandContext<CommandSourceStack> context, String message) {
+        context.getSource().sendFailure(Component.literal(message == null || message.isBlank() ? "Invalid Gatehouse command" : message));
         return 0;
     }
 

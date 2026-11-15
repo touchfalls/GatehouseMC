@@ -4,6 +4,8 @@
 
 # GatehouseMC
 
+> **Fork branch `support/fabric/26.2`:** Fabric-only port for Minecraft 26.2 (Mojang mappings, Java 25, Fabric API 0.161.0+26.2). Build with `./gradlew build`; the jar is `build/libs/gatehousemc-1.2.2.jar`.
+
 <p align="center">
   <a href="https://github.com/DurdeuVlad/GatehouseMC/releases/latest"><img src="https://img.shields.io/github/v/release/DurdeuVlad/GatehouseMC?color=brightgreen&label=Release" alt="Latest GitHub release"></a>
   <a href="https://modrinth.com/mod/gatehousemc"><img src="https://img.shields.io/badge/Modrinth-Submitted%20for%20review-F5A623?logo=modrinth&logoColor=white" alt="Modrinth submitted for review"></a>

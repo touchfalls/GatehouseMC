@@ -9,7 +9,7 @@ import com.gatehousemc.domain.WhitelistRequest;
 import com.gatehousemc.port.WorkflowRepository;
 import com.gatehousemc.runtime.GatehouseRuntime;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -37,9 +37,9 @@ public final class FabricRuntime implements AutoCloseable {
         return new FabricRuntime(server, GatehouseRuntime.degraded(config));
     }
 
-    public Text onWhitelistDenied(GameProfileIdentity profile) {
+    public Component onWhitelistDenied(GameProfileIdentity profile) {
         GatehouseRuntime.AdmissionResponse response = delegate.onWhitelistDenied(profile.toDomain());
-        return Text.literal(response.message());
+        return Component.literal(response.message());
     }
 
     public DecisionService decisions() { return delegate.decisions(); }

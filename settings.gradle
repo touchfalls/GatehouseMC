@@ -19,6 +19,5 @@ rootProject.name = "gatehousemc"
 // only the Forge project, avoiding incompatible Loom/NeoForge plugins.
 if (providers.gradleProperty("enableForge").isPresent()) {
     include("core", "platform-forge")
-} else {
-    include("core", "platform-neoforge")
 }
+// Fabric 26.2 fork: the Fabric jar builds from the root project alone.
